@@ -1,70 +1,107 @@
-const express = require("express");
-const sharp = require("sharp");
+import express from "express";
+import cors from "cors";
 
 const app = express();
-app.use(express.json());
-app.get("/test", async (req, res) => {
-  const text = req.query.text || "DISCIPLINE BUILDS WEALTH";
 
-  const svg = `
-  <svg width="1080" height="1080" xmlns="http://www.w3.org/2000/svg">
-    <rect width="100%" height="100%" fill="#0b2b1e"/>
-    <text x="40" y="70" fill="white" opacity="0.15" font-size="40">LOGO</text>
-    <text x="1040" y="70" fill="white" opacity="0.15" font-size="40" text-anchor="end">LOGO</text>
-    <text x="540" y="95" text-anchor="middle" fill="gold" opacity="0.4" font-size="22">
-      ACHIEVE MORE
-    </text>
-    <foreignObject x="120" y="360" width="840" height="360">
-      <div xmlns="http://www.w3.org/1999/xhtml"
-           style="color:white;font-size:56px;font-family:Georgia,serif;text-align:center;">
-        ${text}
-      </div>
-    </foreignObject>
-  </svg>
-  `;
+/* ===============================
+   GLOBAL MIDDLEWARE
+================================ */
+app.use(express.json({ limit: "1mb" }));
+app.use(cors({ origin: "*", methods: ["GET", "POST"] }));
+app.disable("etag");
 
-  const image = await require("sharp")(Buffer.from(svg)).png().toBuffer();
-  res.set("Content-Type", "image/png");
-  res.send(image);
+/* ===============================
+   HEALTH CHECK (RENDER COLD START)
+================================ */
+app.get("/", (req, res) => {
+  res.status(200).send("OK");
 });
 
-app.post("/render", async (req, res) => {
+/* ===============================
+   RENDER ENDPOINT
+================================ */
+app.post("/render", (req, res) => {
   try {
-    const text = req.body.text || "DISCIPLINE BUILDS WEALTH";
+    const {
+      template,
+      slide,
 
-    const svg = `
-    <svg width="1080" height="1080" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100%" height="100%" fill="#0b2b1e"/>
+      // SLIDE 1
+      heading,
+      hook,
 
-      <!-- Logos -->
-      <text x="40" y="70" fill="white" opacity="0.15" font-size="40">LOGO</text>
-      <text x="1040" y="70" fill="white" opacity="0.15" font-size="40" text-anchor="end">LOGO</text>
+      // SLIDE 2
+      statement,
+      cta
+    } = req.body;
 
-      <!-- Center top text -->
-      <text x="540" y="95" text-anchor="middle" fill="gold" opacity="0.4" font-size="22" letter-spacing="3">
-        ACHIEVE MORE
-      </text>
+    /* -------- HARD VALIDATION -------- */
+    if (template !== "money_magnet_v1") {
+      return res.status(403).json({ error: "Invalid template" });
+    }
 
-      <!-- Main text -->
-      <foreignObject x="120" y="360" width="840" height="360">
-        <div xmlns="http://www.w3.org/1999/xhtml"
-             style="color:white;font-size:56px;font-family:Georgia,serif;text-align:center;line-height:1.3;">
-          ${text}
-        </div>
-      </foreignObject>
-    </svg>
-    `;
+    if (![1, 2].includes(slide)) {
+      return res.status(400).json({ error: "Slide must be 1 or 2" });
+    }
 
-    const image = await sharp(Buffer.from(svg)).png().toBuffer();
-    res.set("Content-Type", "image/png");
-    res.send(image);
+    /* -------- FIXED BRAND ELEMENTS -------- */
+    const brand = {
+      left_logo: "MONEY MAGNET 04",
+      right_logo: "MONEY MAGNET 04",
+      center_text: "ACHIEVE MORE",
+      logo_opacity: 0.35
+    };
+
+    /* -------- SLIDE PAYLOAD -------- */
+    let payload;
+
+    if (slide === 1) {
+      if (!heading || !hook) {
+        return res.status(400).json({
+          error: "Slide 1 requires heading and hook"
+        });
+      }
+
+      payload = {
+        slide: 1,
+        brand,
+        heading,
+        hook
+      };
+    }
+
+    if (slide === 2) {
+      if (!statement || !cta) {
+        return res.status(400).json({
+          error: "Slide 2 requires statement and cta"
+        });
+      }
+
+      payload = {
+        slide: 2,
+        brand,
+        statement,
+        cta
+      };
+    }
+
+    return res.status(200).json({
+      status: "ready",
+      payload
+    });
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({
+      error: "Render failure",
+      message: err.message
+    });
   }
 });
 
-const PORT = process.env.PORT || 3000;
+/* ===============================
+   PORT BINDING
+================================ */
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log("Image renderer running on port", PORT);
+  console.log(`Image render engine running on port ${PORT}`);
 });
