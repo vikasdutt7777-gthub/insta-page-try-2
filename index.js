@@ -3,58 +3,63 @@ import cors from "cors";
 
 const app = express();
 
-/* ===============================
-   GLOBAL MIDDLEWARE
-================================ */
+/* =====================================
+   GLOBAL MIDDLEWARE (STABILITY)
+===================================== */
 app.use(express.json({ limit: "1mb" }));
 app.use(cors({ origin: "*", methods: ["GET", "POST"] }));
 app.disable("etag");
 
-/* ===============================
-   HEALTH CHECK (RENDER COLD START)
-================================ */
+/* =====================================
+   HEALTH CHECK (RENDER COLD START FIX)
+===================================== */
 app.get("/", (req, res) => {
   res.status(200).send("OK");
 });
 
-/* ===============================
-   RENDER ENDPOINT
-================================ */
+/* =====================================
+   IMAGE RENDER ENDPOINT
+   (TEXT → TEMPLATE PAYLOAD)
+===================================== */
 app.post("/render", (req, res) => {
   try {
     const {
       template,
       slide,
 
-      // SLIDE 1
+      // PAGE 1 (Slide 1)
       heading,
       hook,
 
-      // SLIDE 2
+      // PAGE 2 (Slide 2)
       statement,
       cta
     } = req.body;
 
-    /* -------- HARD VALIDATION -------- */
+    /* ---------- HARD GUARDS ---------- */
     if (template !== "money_magnet_v1") {
-      return res.status(403).json({ error: "Invalid template" });
+      return res.status(403).json({
+        error: "Invalid template. Brand locked."
+      });
     }
 
     if (![1, 2].includes(slide)) {
-      return res.status(400).json({ error: "Slide must be 1 or 2" });
+      return res.status(400).json({
+        error: "Slide must be 1 or 2 only"
+      });
     }
 
-    /* -------- FIXED BRAND ELEMENTS -------- */
+    /* ---------- FIXED BRAND ELEMENTS ---------- */
     const brand = {
-      left_logo: "MONEY MAGNET 04",
-      right_logo: "MONEY MAGNET 04",
-      center_text: "ACHIEVE MORE",
+      logo_text: "MONEY MAGNET 04",
+      center_line: "ACHIEVE MORE",
       logo_opacity: 0.35
     };
 
-    /* -------- SLIDE PAYLOAD -------- */
+    /* ---------- SLIDE LOGIC ---------- */
     let payload;
 
+    // PAGE 1
     if (slide === 1) {
       if (!heading || !hook) {
         return res.status(400).json({
@@ -63,13 +68,14 @@ app.post("/render", (req, res) => {
       }
 
       payload = {
-        slide: 1,
+        page: 1,
         brand,
         heading,
         hook
       };
     }
 
+    // PAGE 2
     if (slide === 2) {
       if (!statement || !cta) {
         return res.status(400).json({
@@ -78,13 +84,14 @@ app.post("/render", (req, res) => {
       }
 
       payload = {
-        slide: 2,
+        page: 2,
         brand,
         statement,
         cta
       };
     }
 
+    /* ---------- RESPONSE ---------- */
     return res.status(200).json({
       status: "ready",
       payload
@@ -92,16 +99,16 @@ app.post("/render", (req, res) => {
 
   } catch (err) {
     return res.status(500).json({
-      error: "Render failure",
+      error: "Render engine failure",
       message: err.message
     });
   }
 });
 
-/* ===============================
-   PORT BINDING
-================================ */
+/* =====================================
+   PORT (RENDER SAFE)
+===================================== */
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`Image render engine running on port ${PORT}`);
+  console.log(`Money Magnet render engine running on port ${PORT}`);
 });
